@@ -53,11 +53,11 @@ pub fn current() -> Thread {
 }
 
 /// Puts the current thread to sleep for the specified amount of time.
-pub fn sleep(dur: Duration) {
+pub async fn sleep(dur: Duration) {
     let time = dur_to_ticks(dur);
     trace!("sleep: {:?} ticks", time);
-    processor().manager().sleep(current().id(), time);
-    park();
+    processor().manager().sleep(current().id(), time).await;
+    park().await;
 
     fn dur_to_ticks(dur: Duration) -> usize {
         return dur.as_secs() as usize * 100 + dur.subsec_nanos() as usize / 10_000_000;
@@ -128,17 +128,17 @@ pub fn yield_now() {
 }
 
 /// Blocks unless or until the current thread's token is made available.
-pub fn park() {
+pub async fn park() {
     trace!("park:");
-    processor().manager().sleep(current().id(), 0);
+    processor().manager().sleep(current().id(), 0).await;
     yield_now();
 }
 
 /// Blocks unless or until the current thread's token is made available.
 /// Calls `f` before thread yields. Can be used to avoid racing.
-pub fn park_action(f: impl FnOnce()) {
+pub async fn park_action(f: impl FnOnce()) {
     trace!("park:");
-    processor().manager().sleep(current().id(), 0);
+    processor().manager().sleep(current().id(), 0).await;
     f();
     yield_now();
 }

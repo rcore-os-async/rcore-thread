@@ -1,7 +1,12 @@
 use crate::scheduler::Scheduler;
 use crate::timer::Timer;
 use alloc::boxed::Box;
+use alloc::collections::btree_map::BTreeMap;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context as FutureContext, Poll, Waker};
 use log::*;
 use spin::{Mutex, MutexGuard};
 
@@ -35,6 +40,40 @@ enum Event {
     Wakeup(Tid),
 }
 
+struct SleepFuture {
+    pub shared_state: Arc<Mutex<SleepSharedState>>,
+}
+
+struct SleepSharedState {
+    completed: bool,
+    waker: Option<Waker>,
+}
+
+impl SleepFuture {
+    pub fn new() -> Self {
+        let shared_state = Arc::new(Mutex::new(SleepSharedState {
+            completed: false,
+            waker: None,
+        }));
+        SleepFuture {
+            shared_state: shared_state,
+        }
+    }
+}
+
+impl Future for SleepFuture {
+    type Output = ();
+    fn poll(self: Pin<&mut Self>, cx: &mut FutureContext<'_>) -> Poll<Self::Output> {
+        let mut shared_state = self.shared_state.lock();
+        if shared_state.completed {
+            Poll::Ready(())
+        } else {
+            shared_state.waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
 pub trait Context {
     /// Switch to target context
     unsafe fn switch_to(&mut self, target: &mut dyn Context);
@@ -48,6 +87,7 @@ pub struct ThreadPool {
     threads: Vec<Mutex<Option<Thread>>>,
     scheduler: Box<dyn Scheduler>,
     timer: Mutex<Timer<Event>>,
+    timer_states: Arc<Mutex<BTreeMap<Tid, Arc<Mutex<SleepSharedState>>>>>,
 }
 
 impl ThreadPool {
@@ -56,6 +96,7 @@ impl ThreadPool {
             threads: new_vec_default(max_proc_num),
             scheduler: Box::new(scheduler),
             timer: Mutex::new(Timer::new()),
+            timer_states: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -94,7 +135,17 @@ impl ThreadPool {
             timer.tick();
             while let Some(event) = timer.pop() {
                 match event {
-                    Event::Wakeup(tid) => self.set_status(tid, Status::Ready),
+                    Event::Wakeup(tid) => {
+                        let mut states = self.timer_states.lock();
+                        let shared_state = states.remove(&tid);
+                        if let Some(shared_state) = shared_state {
+                            let mut shared_state = shared_state.lock();
+                            self.set_status(tid, Status::Ready);
+                            if let Some(waker) = shared_state.waker.take() {
+                                waker.wake()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -196,11 +247,16 @@ impl ThreadPool {
 
     /// Sleep `tid` for `time` ticks.
     /// `time` == 0 means sleep forever
-    pub fn sleep(&self, tid: Tid, time: usize) {
+    pub fn sleep(&self, tid: Tid, time: usize) -> impl Future {
         self.set_status(tid, Status::Sleeping);
+        let future = SleepFuture::new();
+        self.timer_states
+            .lock()
+            .insert(tid, future.shared_state.clone());
         if time != 0 {
             self.timer.lock().start(time, Event::Wakeup(tid));
         }
+        future
     }
 
     /// Cancel sleeping after stop
