@@ -73,7 +73,8 @@ impl Timer {
         crate::println!("MinEv, {:?}", timeout);
         if timeout != self.cur_timeout {
             self.cur_timeout = timeout;
-            let to = timeout.map(|e| e as u64).unwrap_or(INFINITY_TO).min(MAX_TO);
+            let time = riscv::register::time::read();
+            let to = timeout.map(|e| e as u64).unwrap_or(INFINITY_TO).min(time as u64 + MAX_TO);
             crate::println!("Schd at {}", to);
             super::sbi::set_timer(to);
         }
