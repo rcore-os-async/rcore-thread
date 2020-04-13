@@ -39,6 +39,13 @@ pub struct Timer {
 }
 
 impl Timer {
+    pub const fn const_new() -> Timer {
+        Timer {
+            wheel: Wheel::new_bounded(0),
+            cur_timeout: None,
+        }
+    }
+
     pub fn new() -> Timer {
         let time = riscv::register::time::read();
         Timer {
