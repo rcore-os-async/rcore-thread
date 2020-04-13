@@ -30,7 +30,7 @@ pub fn _print(args: fmt::Arguments) {
 }
 
 const INFINITY_TO: u64= core::u64::MAX;
-const MAX_TO: u64= 100000;
+const MAX_TO: u64= 100000000;
 const RT_CLK_FREQ: u64 = 100000;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
@@ -107,10 +107,22 @@ impl core::future::Future for Timeout {
     fn poll(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>)
     -> core::task::Poll<Self::Output> {
         crate::println!("Timeout polled");
-        if self.timer.lock().schedule(cx.waker().clone(), self.target_tick) {
+
+        let enabled = riscv::register::sie::read().stimer();
+        if enabled {
+            unsafe { riscv::register::sie::clear_stimer() };
+        }
+
+        let ret = if self.timer.lock().schedule(cx.waker().clone(), self.target_tick) {
             core::task::Poll::Ready(())
         } else {
             core::task::Poll::Pending
+        };
+
+        if enabled {
+            unsafe { riscv::register::sie::set_stimer() };
         }
+
+        ret
     }
 }
