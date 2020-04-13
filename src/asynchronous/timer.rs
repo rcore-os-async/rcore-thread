@@ -30,7 +30,7 @@ pub fn _print(args: fmt::Arguments) {
 }
 
 const INFINITY_TO: u64= core::u64::MAX;
-const RT_CLK_FREQ: u64 = 1000000;
+const RT_CLK_FREQ: u64 = 100000;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
 pub struct Timer {
@@ -94,7 +94,7 @@ impl Timeout {
         let tick = tick_dur as usize + cur;
         crate::println!("Timeout created at {}", tick);
         Timeout {
-            target_tick: 0,
+            target_tick: tick,
             timer: timer,
         }
     }
