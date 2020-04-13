@@ -30,8 +30,8 @@ pub fn _print(args: fmt::Arguments) {
 }
 
 const INFINITY_TO: u64= core::u64::MAX;
-const MAX_TO: u64= 100;
-const RT_CLK_FREQ: u64 = 10;
+const MAX_TO: u64= 100000;
+const RT_CLK_FREQ: u64 = 100000;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
 pub struct Timer {
