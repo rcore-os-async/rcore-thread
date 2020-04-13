@@ -19,11 +19,6 @@ pub fn console_getchar() -> usize {
     sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0)
 }
 
-pub fn shutdown() -> ! {
-    sbi_call(SBI_SHUTDOWN, 0, 0, 0);
-    unreachable!()
-}
-
 pub fn set_timer(stime_value: u64) {
     sbi_call(SBI_SET_TIMER, stime_value as usize, 0, 0);
 }
@@ -31,4 +26,3 @@ pub fn set_timer(stime_value: u64) {
 const SBI_SET_TIMER: usize = 0;
 const SBI_CONSOLE_PUTCHAR: usize = 1;
 const SBI_CONSOLE_GETCHAR: usize = 2;
-const SBI_SHUTDOWN: usize = 8;
