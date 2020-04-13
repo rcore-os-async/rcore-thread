@@ -30,6 +30,7 @@ pub fn _print(args: fmt::Arguments) {
 }
 
 const INFINITY_TO: u64= core::u64::MAX;
+const MAX_TO: u64= 100;
 const RT_CLK_FREQ: u64 = 10;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
@@ -55,8 +56,8 @@ impl Timer {
     }
 
     pub fn wakeup(&mut self) {
-        crate::println!("Wakeup!");
         let time = riscv::register::time::read();
+        crate::println!("Wakeup at {}", time);
         self.wheel.fast_forward(time, |waker, _at| waker.wake());
     }
 
@@ -72,7 +73,7 @@ impl Timer {
         crate::println!("MinEv, {:?}", timeout);
         if timeout != self.cur_timeout {
             self.cur_timeout = timeout;
-            let to = timeout.map(|e| e as u64).unwrap_or(INFINITY_TO);
+            let to = timeout.map(|e| e as u64).unwrap_or(INFINITY_TO).min(MAX_TO);
             crate::println!("Schd at {}", to);
             super::sbi::set_timer(to);
         }
