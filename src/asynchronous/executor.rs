@@ -26,7 +26,7 @@ impl Executor {
         handle
     }
 
-    pub fn run_forever(self) -> ! {
+    pub fn run_forever(&self) -> ! {
         loop {
             if let Some(task) = self.queue.pop() {
                 task.run();
