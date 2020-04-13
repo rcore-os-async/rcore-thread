@@ -31,7 +31,7 @@ pub fn _print(args: fmt::Arguments) {
 
 const INFINITY_TO: u64= core::u64::MAX;
 const MAX_TO: u64= 100000000000;
-const RT_CLK_FREQ: u64 = 32768000;
+const RT_CLK_FREQ: u64 = 10000000;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
 pub struct Timer {
@@ -57,14 +57,14 @@ impl Timer {
 
     pub fn wakeup(&mut self) {
         let time = riscv::register::time::read();
-        crate::println!("Wakeup at {}", time);
+        // crate::println!("Wakeup at {}", time);
         self.wheel.fast_forward(time, |waker, _at| waker.wake());
         self.retime();
     }
 
     fn schedule(&mut self, waker: Waker, tick: usize) -> bool {
         let elapsed = self.wheel.elapsed();
-        crate::println!("Schd, {} -> {}", elapsed, tick);
+        // crate::println!("Schd, {} -> {}", elapsed, tick);
         if elapsed >= tick {
             return true;
         }
@@ -77,12 +77,12 @@ impl Timer {
 
     fn retime(&mut self) {
         let timeout = self.wheel.min_next_event();
-        crate::println!("MinEv, {:?}", timeout);
+        // crate::println!("MinEv, {:?}", timeout);
         if timeout != self.cur_timeout {
             self.cur_timeout = timeout;
             let time = riscv::register::time::read();
             let to = timeout.map(|e| e as u64).unwrap_or(INFINITY_TO).min(time as u64 + MAX_TO);
-            crate::println!("Schd at {}", to);
+            // crate::println!("Schd at {}", to);
             super::sbi::set_timer(to);
         }
     }
@@ -99,7 +99,7 @@ impl Timeout {
         let tick_dur = dur.as_micros() * RT_CLK_FREQ as u128 / 1_000_000;
         let cur = riscv::register::time::read();
         let tick = tick_dur as usize + cur;
-        crate::println!("Timeout created at {}", tick);
+        // crate::println!("Timeout created at {}", tick);
         Timeout {
             target_tick: tick,
             timer: timer,
@@ -111,7 +111,7 @@ impl core::future::Future for Timeout {
     type Output = ();
     fn poll(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>)
     -> core::task::Poll<Self::Output> {
-        crate::println!("Timeout polled");
+        // crate::println!("Timeout polled");
 
         let enabled = riscv::register::sie::read().stimer();
         if enabled {
