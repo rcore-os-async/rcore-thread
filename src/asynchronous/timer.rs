@@ -30,8 +30,8 @@ pub fn _print(args: fmt::Arguments) {
 }
 
 const INFINITY_TO: u64= core::u64::MAX;
-const MAX_TO: u64= 100000000;
-const RT_CLK_FREQ: u64 = 100000;
+const MAX_TO: u64= 100000000000;
+const RT_CLK_FREQ: u64 = 32768000;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
 pub struct Timer {
@@ -59,6 +59,7 @@ impl Timer {
         let time = riscv::register::time::read();
         crate::println!("Wakeup at {}", time);
         self.wheel.fast_forward(time, |waker, _at| waker.wake());
+        self.retime();
     }
 
     fn schedule(&mut self, waker: Waker, tick: usize) -> bool {
@@ -69,6 +70,12 @@ impl Timer {
         }
 
         self.wheel.schedule(tick, waker).unwrap();
+        self.retime();
+
+        return false;
+    }
+
+    fn retime(&mut self) {
         let timeout = self.wheel.min_next_event();
         crate::println!("MinEv, {:?}", timeout);
         if timeout != self.cur_timeout {
@@ -78,8 +85,6 @@ impl Timer {
             crate::println!("Schd at {}", to);
             super::sbi::set_timer(to);
         }
-
-        return false;
     }
 }
 
@@ -91,7 +96,7 @@ pub struct Timeout {
 impl Timeout {
     pub fn from(timer: &'static Mutex<Timer>, dur: core::time::Duration) -> Timeout {
         puts("Creating timeout...");
-        let tick_dur = dur.as_micros() / RT_CLK_FREQ as u128;
+        let tick_dur = dur.as_micros() * RT_CLK_FREQ as u128 / 1_000_000;
         let cur = riscv::register::time::read();
         let tick = tick_dur as usize + cur;
         crate::println!("Timeout created at {}", tick);
