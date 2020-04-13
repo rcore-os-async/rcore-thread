@@ -89,10 +89,10 @@ pub struct Timeout {
 impl Timeout {
     pub fn from(timer: &'static Mutex<Timer>, dur: core::time::Duration) -> Timeout {
         puts("Creating timeout...");
-        // let tick_dur = dur.as_micros() / RT_CLK_FREQ as u128;
-        // let cur = riscv::register::time::read();
-        // let tick = tick_dur as usize + cur;
-        // crate::println!("Timeout created at {}", tick);
+        let tick_dur = dur.as_micros() / RT_CLK_FREQ as u128;
+        let cur = riscv::register::time::read();
+        let tick = tick_dur as usize + cur;
+        crate::println!("Timeout created at {}", tick);
         Timeout {
             target_tick: 0,
             timer: timer,
