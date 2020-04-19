@@ -3,19 +3,16 @@
 #![feature(asm)]
 #![feature(naked_functions)]
 #![feature(global_asm)]
-#![feature(const_generics)]
-//#![deny(warnings)]
+#![deny(warnings)]
 
 extern crate alloc;
 
+pub mod asynchronous;
 mod interrupt;
 mod processor;
 pub mod scheduler;
 pub mod std_thread;
 mod thread_pool;
-mod waker_pool;
-pub mod asynchronous;
-mod timer;
 
 #[cfg(target_arch = "x86_64")]
 #[path = "./context/x86_64.rs"]

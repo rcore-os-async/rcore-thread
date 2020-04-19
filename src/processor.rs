@@ -1,9 +1,11 @@
+use crate::asynchronous::timer::Timer;
 use crate::interrupt;
 use crate::thread_pool::*;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 use log::*;
+use spin::Mutex;
 
 /// Thread executor
 ///
@@ -29,6 +31,8 @@ struct ProcessorInner {
     loop_context: Box<dyn Context>,
     /// Reference to `ThreadPool`
     manager: Arc<ThreadPool>,
+    /// Reference to `Timer`
+    timer: Arc<Mutex<Timer>>,
 }
 
 impl Processor {
@@ -39,12 +43,19 @@ impl Processor {
     }
 
     /// Initialize the `Processor`
-    pub unsafe fn init(&self, id: usize, context: Box<dyn Context>, manager: Arc<ThreadPool>) {
+    pub unsafe fn init(
+        &self,
+        id: usize,
+        context: Box<dyn Context>,
+        manager: Arc<ThreadPool>,
+        timer: Arc<Mutex<Timer>>,
+    ) {
         *self.inner.get() = Some(ProcessorInner {
             id,
             thread: None,
             loop_context: context,
             manager,
+            timer,
         });
     }
 
@@ -63,7 +74,7 @@ impl Processor {
     /// - switch to start running that process
     /// - eventually that process transfers control
     ///   via switch back to the scheduler.
-    pub fn run(&self) -> ! {
+    pub async fn run(&self) {
         let inner = self.inner();
         loop {
             if let Some(thread) = inner.manager.run(inner.id) {
@@ -124,6 +135,11 @@ impl Processor {
     /// Get the `ThreadPool`.
     pub fn manager(&self) -> &ThreadPool {
         &*self.inner().manager
+    }
+
+    /// Get the `Timer`.
+    pub fn timer(&self) -> &Mutex<Timer> {
+        &*self.inner().timer
     }
 
     /// Called by timer interrupt handler.

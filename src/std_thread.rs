@@ -6,6 +6,7 @@
 //! - `processor`: Get a reference of the current `Processor`
 //! - `new_kernel_context`: Construct a `Context` of the new kernel thread
 
+use crate::asynchronous::timer::Timeout;
 use crate::interrupt::no_interrupt;
 use crate::processor::*;
 use crate::thread_pool::*;
@@ -56,7 +57,7 @@ pub fn current() -> Thread {
 pub async fn sleep(dur: Duration) {
     let time = dur_to_ticks(dur);
     trace!("sleep: {:?} ticks", time);
-    processor().manager().sleep(current().id(), time).await;
+    Timeout::from(processor().timer(), time).await;
     park().await;
 
     fn dur_to_ticks(dur: Duration) -> usize {
@@ -130,7 +131,7 @@ pub fn yield_now() {
 /// Blocks unless or until the current thread's token is made available.
 pub async fn park() {
     trace!("park:");
-    processor().manager().sleep(current().id(), 0).await;
+    Timeout::from(processor().timer(), 0).await;
     yield_now();
 }
 
@@ -138,7 +139,7 @@ pub async fn park() {
 /// Calls `f` before thread yields. Can be used to avoid racing.
 pub async fn park_action(f: impl FnOnce()) {
     trace!("park:");
-    processor().manager().sleep(current().id(), 0).await;
+    Timeout::from(processor().timer(), 0).await;
     f();
     yield_now();
 }

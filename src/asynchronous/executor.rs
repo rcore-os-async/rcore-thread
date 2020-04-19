@@ -1,6 +1,6 @@
-use queueue::queue::nonblocking::*;
-use core::future::Future;
 use async_task::Task;
+use core::future::Future;
+use queueue::queue::nonblocking::*;
 
 use super::sbi;
 use core::fmt;
@@ -59,7 +59,6 @@ pub fn getchar_option() -> Option<char> {
     }
 }
 
-
 type ExecutionTag = ();
 
 pub struct Executor {
@@ -69,12 +68,14 @@ pub struct Executor {
 impl Executor {
     pub fn new() -> Self {
         Self {
-            queue: StaticSpinQueue::default()
+            queue: StaticSpinQueue::default(),
         }
     }
 
     pub fn spawn<F>(&'static self, fut: F) -> async_task::JoinHandle<(), ExecutionTag>
-    where F: Future<Output=()> + Send + 'static {
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
         let prod = self.queue.producer();
         let schedule = move |task| {
             println!("Pushed");

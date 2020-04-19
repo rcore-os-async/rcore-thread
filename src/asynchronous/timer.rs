@@ -1,10 +1,10 @@
-use queueue::timing_wheel::hierarchical::BoundedWheel;
 use core::task::Waker;
+use queueue::timing_wheel::hierarchical::BoundedWheel;
 use riscv;
 use spin::Mutex;
 
-use core::fmt::{self, Write};
 use super::sbi;
+use core::fmt::{self, Write};
 
 pub fn putchar(ch: char) {
     sbi::console_putchar(ch as u8 as usize);
@@ -29,9 +29,9 @@ pub fn _print(args: fmt::Arguments) {
     Stdout.write_fmt(args).unwrap();
 }
 
-const INFINITY_TO: u64= core::u64::MAX;
-const MAX_TO: u64= 100000000000;
-const RT_CLK_FREQ: u64 = 10000000;
+const INFINITY_TO: u64 = core::u64::MAX;
+const MAX_TO: u64 = 100000000000;
+const _RT_CLK_FREQ: u64 = 10000000;
 
 type Wheel = BoundedWheel<Waker, 2>; // TODO: use slab alloc
 pub struct Timer {
@@ -81,7 +81,10 @@ impl Timer {
         if timeout != self.cur_timeout {
             self.cur_timeout = timeout;
             let time = riscv::register::time::read();
-            let to = timeout.map(|e| e as u64).unwrap_or(INFINITY_TO).min(time as u64 + MAX_TO);
+            let to = timeout
+                .map(|e| e as u64)
+                .unwrap_or(INFINITY_TO)
+                .min(time as u64 + MAX_TO);
             // crate::println!("Schd at {}", to);
             super::sbi::set_timer(to);
         }
@@ -94,11 +97,10 @@ pub struct Timeout {
 }
 
 impl Timeout {
-    pub fn from(timer: &'static Mutex<Timer>, dur: core::time::Duration) -> Timeout {
+    pub fn from(timer: &'static Mutex<Timer>, ticks: usize) -> Timeout {
         puts("Creating timeout...");
-        let tick_dur = dur.as_micros() * RT_CLK_FREQ as u128 / 1_000_000;
         let cur = riscv::register::time::read();
-        let tick = tick_dur as usize + cur;
+        let tick = ticks + cur;
         // crate::println!("Timeout created at {}", tick);
         Timeout {
             target_tick: tick,
@@ -109,8 +111,10 @@ impl Timeout {
 
 impl core::future::Future for Timeout {
     type Output = ();
-    fn poll(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>)
-    -> core::task::Poll<Self::Output> {
+    fn poll(
+        self: core::pin::Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> core::task::Poll<Self::Output> {
         // crate::println!("Timeout polled");
 
         let enabled = riscv::register::sie::read().stimer();
@@ -118,7 +122,11 @@ impl core::future::Future for Timeout {
             unsafe { riscv::register::sie::clear_stimer() };
         }
 
-        let ret = if self.timer.lock().schedule(cx.waker().clone(), self.target_tick) {
+        let ret = if self
+            .timer
+            .lock()
+            .schedule(cx.waker().clone(), self.target_tick)
+        {
             core::task::Poll::Ready(())
         } else {
             core::task::Poll::Pending

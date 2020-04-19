@@ -1,12 +1,6 @@
 use crate::scheduler::Scheduler;
-use crate::timer::Timer;
 use alloc::boxed::Box;
-use alloc::collections::btree_map::BTreeMap;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context as FutureContext, Poll, Waker};
 use log::*;
 use spin::{Mutex, MutexGuard};
 
@@ -35,45 +29,6 @@ pub enum Status {
     Exited(ExitCode),
 }
 
-#[derive(Eq, PartialEq)]
-enum Event {
-    Wakeup(Tid),
-}
-
-struct SleepFuture {
-    pub shared_state: Arc<Mutex<SleepSharedState>>,
-}
-
-struct SleepSharedState {
-    completed: bool,
-    waker: Option<Waker>,
-}
-
-impl SleepFuture {
-    pub fn new() -> Self {
-        let shared_state = Arc::new(Mutex::new(SleepSharedState {
-            completed: false,
-            waker: None,
-        }));
-        SleepFuture {
-            shared_state: shared_state,
-        }
-    }
-}
-
-impl Future for SleepFuture {
-    type Output = ();
-    fn poll(self: Pin<&mut Self>, cx: &mut FutureContext<'_>) -> Poll<Self::Output> {
-        let mut shared_state = self.shared_state.lock();
-        if shared_state.completed {
-            Poll::Ready(())
-        } else {
-            shared_state.waker = Some(cx.waker().clone());
-            Poll::Pending
-        }
-    }
-}
-
 pub trait Context {
     /// Switch to target context
     unsafe fn switch_to(&mut self, target: &mut dyn Context);
@@ -86,8 +41,6 @@ pub trait Context {
 pub struct ThreadPool {
     threads: Vec<Mutex<Option<Thread>>>,
     scheduler: Box<dyn Scheduler>,
-    timer: Mutex<Timer<Event>>,
-    timer_states: Arc<Mutex<BTreeMap<Tid, Arc<Mutex<SleepSharedState>>>>>,
 }
 
 impl ThreadPool {
@@ -95,8 +48,6 @@ impl ThreadPool {
         ThreadPool {
             threads: new_vec_default(max_proc_num),
             scheduler: Box::new(scheduler),
-            timer: Mutex::new(Timer::new()),
-            timer_states: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -129,26 +80,7 @@ impl ThreadPool {
     /// Make thread `tid` time slice -= 1.
     /// Return true if time slice == 0.
     /// Called by timer interrupt handler.
-    pub(crate) fn tick(&self, cpu_id: usize, tid: Option<Tid>) -> bool {
-        if cpu_id == 0 {
-            let mut timer = self.timer.lock();
-            timer.tick();
-            while let Some(event) = timer.pop() {
-                match event {
-                    Event::Wakeup(tid) => {
-                        let mut states = self.timer_states.lock();
-                        let shared_state = states.remove(&tid);
-                        if let Some(shared_state) = shared_state {
-                            let mut shared_state = shared_state.lock();
-                            self.set_status(tid, Status::Ready);
-                            if let Some(waker) = shared_state.waker.take() {
-                                waker.wake()
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    pub(crate) fn tick(&self, _cpu_id: usize, tid: Option<Tid>) -> bool {
         match tid {
             Some(tid) => self.scheduler.tick(tid),
             None => false,
@@ -207,7 +139,6 @@ impl ThreadPool {
                 (Status::Ready, Status::Ready) => return,
                 (Status::Ready, _) => self.scheduler.remove(tid),
                 (Status::Exited(_), _) => panic!("can not set status for a exited thread"),
-                (Status::Sleeping, Status::Exited(_)) => self.timer.lock().stop(Event::Wakeup(tid)),
                 (Status::Running(_), Status::Ready) => {} // thread will be added to scheduler in stop()
                 (_, Status::Ready) => self.scheduler.push(tid),
                 _ => {}
@@ -243,20 +174,6 @@ impl ThreadPool {
             }
             _ => None,
         }
-    }
-
-    /// Sleep `tid` for `time` ticks.
-    /// `time` == 0 means sleep forever
-    pub fn sleep(&self, tid: Tid, time: usize) -> impl Future {
-        self.set_status(tid, Status::Sleeping);
-        let future = SleepFuture::new();
-        self.timer_states
-            .lock()
-            .insert(tid, future.shared_state.clone());
-        if time != 0 {
-            self.timer.lock().start(time, Event::Wakeup(tid));
-        }
-        future
     }
 
     /// Cancel sleeping after stop
