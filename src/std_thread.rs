@@ -61,7 +61,7 @@ pub async fn sleep(dur: Duration) {
     park().await;
 
     fn dur_to_ticks(dur: Duration) -> usize {
-        return dur.as_secs() as usize * 100 + dur.subsec_nanos() as usize / 10_000_000;
+        dur.as_micros() as usize * 10
     }
 }
 
