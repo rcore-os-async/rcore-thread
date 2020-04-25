@@ -11,18 +11,8 @@ fn sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     ret
 }
 
-pub fn console_putchar(ch: usize) {
-    sbi_call(SBI_CONSOLE_PUTCHAR, ch, 0, 0);
-}
-
-pub fn console_getchar() -> usize {
-    sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0)
-}
-
 pub fn set_timer(stime_value: u64) {
     sbi_call(SBI_SET_TIMER, stime_value as usize, 0, 0);
 }
 
 const SBI_SET_TIMER: usize = 0;
-const SBI_CONSOLE_PUTCHAR: usize = 1;
-const SBI_CONSOLE_GETCHAR: usize = 2;

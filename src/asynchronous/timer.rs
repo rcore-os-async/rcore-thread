@@ -1,33 +1,8 @@
 use core::task::Waker;
+use log::*;
 use queueue::timing_wheel::hierarchical::BoundedWheel;
 use riscv;
 use spin::Mutex;
-
-use super::sbi;
-use core::fmt::{self, Write};
-
-pub fn putchar(ch: char) {
-    sbi::console_putchar(ch as u8 as usize);
-}
-
-pub fn puts(s: &str) {
-    for ch in s.chars() {
-        putchar(ch);
-    }
-}
-
-struct Stdout;
-
-impl fmt::Write for Stdout {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        puts(s);
-        Ok(())
-    }
-}
-
-pub fn _print(args: fmt::Arguments) {
-    Stdout.write_fmt(args).unwrap();
-}
 
 const INFINITY_TO: u64 = core::u64::MAX;
 const MAX_TO: u64 = 100000000000;
@@ -98,7 +73,7 @@ pub struct Timeout {
 
 impl Timeout {
     pub fn from(timer: &'static Mutex<Timer>, ticks: usize) -> Timeout {
-        puts("Creating timeout...");
+        trace!("Creating timeout...");
         let cur = riscv::register::time::read();
         let tick = ticks + cur;
         // crate::println!("Timeout created at {}", tick);
