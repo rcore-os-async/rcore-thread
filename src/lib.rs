@@ -8,11 +8,7 @@
 extern crate alloc;
 
 pub mod asynchronous;
-mod interrupt;
-mod processor;
 pub mod scheduler;
-pub mod std_thread;
-mod thread_pool;
 
 #[cfg(target_arch = "x86_64")]
 #[path = "./context/x86_64.rs"]
@@ -29,6 +25,3 @@ pub mod context;
 #[cfg(target_arch = "mips")]
 #[path = "./context/mipsel.rs"]
 pub mod context;
-
-pub use crate::processor::Processor;
-pub use crate::thread_pool::*;
