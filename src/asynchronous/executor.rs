@@ -4,7 +4,6 @@ use core::future::Future;
 use lazy_static::*;
 use log::*;
 use queueue::queue::nonblocking::*;
-use spin::Mutex;
 
 type ExecutionTag = ();
 
@@ -35,22 +34,22 @@ impl Executor {
 }
 
 lazy_static! {
-    static ref GLOBAL_EXECUTOR: Mutex<Box<Executor>> = {
+    static ref GLOBAL_EXECUTOR: Box<Executor> = {
         let m = Executor::new();
-        Mutex::new(Box::new(m))
+        Box::new(m)
     };
 }
 
-pub fn spawn<F>(fut: F) -> async_task::JoinHandle<(), ExecutionTag>
+pub fn spawn<F>(fut: F)
 where
     F: Future<Output = ()> + Send + 'static,
 {
-    GLOBAL_EXECUTOR.lock().spawn(fut)
+    GLOBAL_EXECUTOR.spawn(fut);
 }
 
 pub fn fun() -> ! {
     loop {
-        if let Some(task) = GLOBAL_EXECUTOR.lock().queue.pop() {
+        if let Some(task) = GLOBAL_EXECUTOR.queue.pop() {
             trace!("Popped");
             task.run();
             trace!("Run over");
