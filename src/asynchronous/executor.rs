@@ -47,7 +47,7 @@ where
     GLOBAL_EXECUTOR.spawn(fut);
 }
 
-pub fn fun() -> ! {
+pub fn run() -> ! {
     loop {
         if let Some(task) = GLOBAL_EXECUTOR.queue.pop() {
             trace!("Popped");
