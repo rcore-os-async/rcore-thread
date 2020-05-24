@@ -20,3 +20,6 @@ riscv = "0.5.6"
 [dependencies.lazy_static]
 version = "1.4.0"
 features = ["spin_no_std"]
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.9"

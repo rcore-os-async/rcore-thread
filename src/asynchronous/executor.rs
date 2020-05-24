@@ -53,6 +53,9 @@ pub fn run() -> ! {
             trace!("Popped");
             task.run();
             trace!("Run over");
+        } else {
+            x86_64::instructions::interrupts::enable_interrupts_and_hlt();
+            x86_64::instructions::interrupts::disable();
         }
     }
 }
